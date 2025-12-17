@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal Index</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;margin:0;padding:15px}
+h1{margin-top:0}
+.section{background:#fff;margin-bottom:20px;padding:15px;border-radius:6px}
+.item{margin:8px 0}
+input,button{padding:6px;font-size:14px}
+small{color:#555}
+a{text-decoration:none;color:#0645ad}
+</style>
+</head>
+<body>
+
+<h1>Home Portal</h1>
+
+<div class="section">
+  <h2>📍 Location</h2>
+  <input id="location" placeholder="City (e.g. Melbourne)">
+  <button onclick="updateLocation()">Update</button>
+  <div id="loc-status"></div>
+</div>
+
+<div class="section">
+  <h2>🌤 Weather</h2>
+  <div id="weather">Loading…</div>
+</div>
+
+<div class="section">
+  <h2>📰 News</h2>
+  <div id="news">Loading…</div>
+</div>
+
+<div class="section">
+  <h2>🏉 Sports (AFL)</h2>
+  <div id="sports">Loading…</div>
+</div>
+
+<script>
+let lat = -37.81;
+let lon = 144.96;
+
+/* LOCATION → LAT/LON */
+async function updateLocation(){
+  const city = document.getElementById('location').value;
+  if(!city) return;
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.results && data.results.length){
+    lat = data.results[0].latitude;
+    lon = data.results[0].longitude;
+    document.getElementById('loc-status').textContent = `Using ${data.results[0].name}`;
+    fetchWeather();
+  } else {
+    document.getElementById('loc-status').textContent = 'Location not found';
+  }
+}
+
+/* WEATHER – Open‑Meteo (no key) */
+async function fetchWeather(){
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+  try{
+    const res = await fetch(url);
+    const w = await res.json();
+    document.getElementById('weather').innerHTML =
+      `${w.current_weather.temperature}°C, wind ${w.current_weather.windspeed} km/h`;
+  }catch{
+    document.getElementById('weather').textContent = 'Weather unavailable';
+  }
+}
+
+/* NEWS – MULTIPLE RSS FEEDS (NO API KEYS)
+   Uses rss2json public service */
+const newsFeeds = [
+  'https://www.sbs.com.au/news/feed',
+  'https://www.abc.net.au/news/feed/51120/rss.xml',
+  'https://www.theguardian.com/au/rss'
+];
+
+async function fetchNews(){
+  let html = '';
+  for(const feed of newsFeeds){
+    try{
+      const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      html += `<h4>${data.feed.title}</h4>`;
+      data.items.slice(0,3).forEach(i=>{
+        html += `<div class="item"><a href="${i.link}" target="_blank">${i.title}</a></div>`;
+      });
+    }catch{}
+  }
+  document.getElementById('news').innerHTML = html || 'News unavailable';
+}
+
+/* SPORTS – MULTIPLE AFL FEEDS (Squiggle) */
+async function fetchSports(){
+  try{
+    const url = 'https://api.squiggle.com.au/?q=games;year=2025';
+    const res = await fetch(url);
+    const data = await res.json();
+    const games = data.games.slice(0,6);
+    document.getElementById('sports').innerHTML = games.map(g=>
+      `<div class="item">${g.hteam} ${g.hscore ?? ''} vs ${g.ateam} ${g.ascore ?? ''}<br><small>${g.date}</small></div>`
+    ).join('');
+  }catch{
+    document.getElementById('sports').textContent = 'Sports unavailable';
+  }
+}
+
+fetchWeather();
+fetchNews();
+fetchSports();
+</script>
+
+</body>
+</html>
