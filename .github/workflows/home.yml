@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Simple Portal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background:#f4f4f4;
+  margin:20px;
+}
+.section {
+  background:#fff;
+  padding:15px;
+  margin-bottom:20px;
+  border-radius:4px;
+}
+h2 {
+  margin-top:0;
+  border-bottom:1px solid #ccc;
+}
+.item {
+  margin:8px 0;
+}
+input, button {
+  padding:5px;
+  font-size:14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="section">
+  <h2>🌤️ Weather</h2>
+  <input id="locationInput" placeholder="Enter city (e.g. Melbourne)">
+  <button onclick="loadWeather()">Go</button>
+  <div id="weather-data" class="item">Enter a location</div>
+</div>
+
+<div class="section">
+  <h2>📰 News (SBS)</h2>
+  <div id="news-data">Loading news...</div>
+</div>
+
+<div class="section">
+  <h2>🏉 AFL Fixtures</h2>
+  <div id="sports-data">Loading fixtures...</div>
+</div>
+
+<script>
+// ---------------- WEATHER ----------------
+async function loadWeather() {
+  const city = document.getElementById("locationInput").value;
+  if (!city) return;
+
+  try {
+    // Geocoding
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`;
+    const geoRes = await fetch(geoUrl);
+    const geo = await geoRes.json();
+    if (!geo.results) throw "Location not found";
+
+    const { latitude, longitude, name, country } = geo.results[0];
+
+    const weatherUrl =
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+    const wRes = await fetch(weatherUrl);
+    const w = await wRes.json();
+
+    document.getElementById("weather-data").innerHTML =
+      `📍 ${name}, ${country}<br>
+       🌡️ ${w.current_weather.temperature}°C<br>
+       💨 Wind ${w.current_weather.windspeed} km/h`;
+  } catch {
+    document.getElementById("weather-data").textContent = "Weather unavailable";
+  }
+}
+
+// ---------------- NEWS (RSS via CORS proxy) ----------------
+async function loadNews() {
+  const rss =
+    "https://api.allorigins.win/get?url=" +
+    encodeURIComponent("https://www.sbs.com.au/news/feed");
+
+  try {
+    const res = await fetch(rss);
+    const data = await res.json();
+    const xml = new DOMParser().parseFromString(data.contents, "text/xml");
+    const items = Array.from(xml.querySelectorAll("item")).slice(0, 5);
+
+    document.getElementById("news-data").innerHTML =
+      items.map(i => `
+        <div class="item">
+          <a href="${i.querySelector("link").textContent}" target="_blank">
+            ${i.querySelector("title").textContent}
+          </a>
+        </div>
+      `).join("");
+  } catch {
+    document.getElementById("news-data").textContent = "News unavailable";
+  }
+}
+
+// ---------------- SPORTS (AFL Squiggle) ----------------
+async function loadSports() {
+  try {
+    const res = await fetch("https://api.squiggle.com.au/?q=fixtures;year=2025");
+    const data = await res.json();
+
+    document.getElementById("sports-data").innerHTML =
+      data.fixtures.slice(0, 5).map(f => `
+        <div class="item">
+          ${f.hometeam} vs ${f.awayteam}<br>
+          <small>${new Date(f.date).toLocaleString()}</small>
+        </div>
+      `).join("");
+  } catch {
+    document.getElementById("sports-data").textContent = "Sports unavailable";
+  }
+}
+
+loadNews();
+loadSports();
+</script>
+
+</body>
+</html>
